@@ -78,6 +78,8 @@ Swagger UI masing-masing service dapat diakses melalui endpoint:
 - `order-service`: `http://192.168.1.101:3002/swagger`
 - `notification-service`: `http://192.168.1.102:3003/swagger`
 
+### Link Dokumentasi Lengkap: https://docs.google.com/document/d/1638DGDKsO_gErKSxMKh65z7J76O498yrXlhHUGGOBR8/edit?usp=sharing
+
 ### Output command ‘kubectl get pods –o wide’.
 ![Output](images/kubectl-get-pods-wide-output.png)
 
