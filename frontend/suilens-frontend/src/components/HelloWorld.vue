@@ -1,8 +1,14 @@
 <template>
   <v-container class="py-8" max-width="800">
     <v-card>
-      <v-card-title>Live Order Notifications</v-card-title>
-      <v-divider></v-divider>
+      <v-card-title class="d-flex align-center justify-space-between">
+        <span>Live Order Notifications</span>
+        <v-chip size="small" :color="isConnected ? 'success' : 'warning'">
+          {{ isConnected ? "Connected" : "Disconnected" }}
+        </v-chip>
+      </v-card-title>
+
+      <v-divider />
 
       <v-card-text class="py-6" style="min-height: 500px">
         <div
@@ -15,7 +21,7 @@
         <div v-else>
           <div
             v-for="(notification, index) in notifications"
-            :key="index"
+            :key="notification.timestamp + index"
             class="mb-4 pb-4"
             :style="
               index < notifications.length - 1
@@ -34,9 +40,9 @@
         </div>
       </v-card-text>
 
-      <v-divider v-if="notifications.length > 0"></v-divider>
+      <v-divider v-if="notifications.length > 0" />
       <v-card-actions v-if="notifications.length > 0">
-        <v-spacer></v-spacer>
+        <v-spacer />
         <v-btn size="small" variant="text" @click="clearNotifications">
           Clear
         </v-btn>
@@ -46,9 +52,16 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
+
+const NOTIFICATION_WS =
+  import.meta.env.VITE_NOTIFICATION_WS || "ws://localhost:3003/ws/notifications";
 
 const notifications = ref([]);
+const isConnected = ref(false);
+
+let socket = null;
+let reconnectTimer = null;
 
 function formatTime(timestamp) {
   const date = new Date(timestamp);
@@ -62,4 +75,44 @@ function formatTime(timestamp) {
 function clearNotifications() {
   notifications.value = [];
 }
+
+function connectWebSocket() {
+  socket = new WebSocket(NOTIFICATION_WS);
+
+  socket.onopen = () => {
+    isConnected.value = true;
+  };
+
+  socket.onmessage = (event) => {
+    const payload = JSON.parse(event.data);
+
+    if (payload.type === "order.placed") {
+      notifications.value.unshift(payload);
+    }
+  };
+
+  socket.onclose = () => {
+    isConnected.value = false;
+    reconnectTimer = window.setTimeout(connectWebSocket, 3000);
+  };
+
+  socket.onerror = () => {
+    isConnected.value = false;
+    socket?.close();
+  };
+}
+
+onMounted(() => {
+  connectWebSocket();
+});
+
+onBeforeUnmount(() => {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+  }
+
+  if (socket) {
+    socket.close();
+  }
+});
 </script>

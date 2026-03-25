@@ -7,7 +7,23 @@ const RABBITMQ_URL =
 const EXCHANGE_NAME = "suilens.events";
 const QUEUE_NAME = "notification-service.order-events";
 
-export async function startConsumer() {
+interface LiveNotificationPayload {
+  type: string;
+  timestamp: string;
+  data: {
+    orderId: string;
+    customerName: string;
+    customerEmail: string;
+    lensName: string;
+    message: string;
+  };
+}
+
+interface ConsumerHooks {
+  onOrderPlaced?: (payload: LiveNotificationPayload) => void;
+}
+
+export async function startConsumer(hooks: ConsumerHooks = {}) {
   let retries = 0;
   const maxRetries = 10;
   const retryDelay = 2000;
@@ -34,11 +50,25 @@ export async function startConsumer() {
             const { orderId, customerName, customerEmail, lensName } =
               event.data;
 
+            const message = `Hi ${customerName}, your rental order for ${lensName} has been placed successfully. Order ID: ${orderId}`;
+
             await db.insert(notifications).values({
               orderId,
               type: "order_placed",
               recipient: customerEmail,
-              message: `Hi ${customerName}, your rental order for ${lensName} has been placed successfully. Order ID: ${orderId}`,
+              message,
+            });
+
+            hooks.onOrderPlaced?.({
+              type: "order.placed",
+              timestamp: new Date().toISOString(),
+              data: {
+                orderId,
+                customerName,
+                customerEmail,
+                lensName,
+                message,
+              },
             });
 
             console.log(`Notification recorded for order ${orderId}`);
@@ -58,6 +88,7 @@ export async function startConsumer() {
         `Failed to connect to RabbitMQ (attempt ${retries}/${maxRetries}):`,
         (error as Error).message,
       );
+
       if (retries < maxRetries) {
         await new Promise((resolve) => setTimeout(resolve, retryDelay));
       }
